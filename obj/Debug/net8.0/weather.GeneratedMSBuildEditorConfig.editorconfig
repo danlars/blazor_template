@@ -53,3 +53,7 @@ build_metadata.AdditionalFiles.CssScope = b-sw5tcraxno
 [C:/Users/DanielJoachimLarsen/RiderProjects/weather/Components/Layout/NavMenu.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xMYXlvdXRcTmF2TWVudS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = b-2edsvrk3zi
+
+[C:/Users/DanielJoachimLarsen/RiderProjects/weather/Components/Pages/Chat.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xQYWdlc1xDaGF0LnJhem9y
+build_metadata.AdditionalFiles.CssScope = b-nnrbplfbkz

@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.ResponseCompression;
 using weather.Components;
+using weather.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,7 +8,18 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// builder.Services.AddScoped<CircuitHandler, CustomCircuitHandler>();
+builder.Services.AddHttpClient();
+builder.Services.AddSignalR();
+
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+        [ "application/octet-stream" ]);
+});
+
 var app = builder.Build();
+app.UseResponseCompression();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -23,5 +36,5 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-
+app.MapHub<ChatHub>("/chathub");
 app.Run();

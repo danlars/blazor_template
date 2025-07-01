@@ -1,0 +1,134 @@
+﻿@page "/chat"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@inject ILogger<Chat> Logger
+
+<PageTitle>Chat</PageTitle>
+
+<div class="flex-fill d-flex flex-column gap-4 overflow-hidden px-2">
+    <h1>Chat example</h1>
+
+    <div class="d-flex flex-column flex-fill messages gap-4 fs-5">
+        <div class="d-flex gap-3 flex-column">
+            @foreach (var message in Messages) {
+                @if (message.Username == UserName)
+                {
+                    <div class="bg-primary rounded text-white p-3 ms-5">
+                        <span>Fra dig</span><br/>
+                        @message.Message
+                    </div>
+                }
+                else
+                {
+                    <div class="bg-secondary rounded text-white p-3 me-5">
+                        <span>Fra @message.Username</span><br/>
+                        @message.Message
+                    </div>                    
+                }
+            }
+        </div>
+    </div>
+    <div class="mt-auto mb-4 d-flex gap-3 flex-column">
+        <input class="form-control" placeholder="Your username" @bind="@UserName" />
+        <textarea class="form-control" placeholder="Type your message here" rows="5" @bind="@MessageInput" @onkeydown="SendOnEnter"></textarea>
+        <div class="d-flex flex-wrap gap-3 justify-content-end">
+            <button class="btn btn-primary" type="button" @onclick="SendMessage">Send</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private string? UserName;
+    private string MessageInput = String.Empty;
+    private List<ConversationItem> Messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Logger.LogInformation("Chat.razor: OnInitializedAsync bliver kaldt.");
+
+        // Initialize SignalR connection
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/chathub"))
+            .Build();
+        
+        // Lyt til eventuelle forbindelsesafbrydelser for at få mere information
+        hubConnection.Closed += error =>
+        {
+            Logger.LogError(error, "SignalR forbindelse blev lukket uventet.");
+            InvokeAsync(StateHasChanged);
+            return Task.CompletedTask;
+        };
+
+
+        // Listen to incoming messages
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            Messages.Add(new ConversationItem
+            {
+                Username = user,
+                Message = message,
+            });
+            InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            // Start connection
+            await hubConnection.StartAsync();
+            Logger.LogInformation("SignalR forbindelse oprettet.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fejl under oprettelse af SignalR forbindelse.");
+            // Her kan du også vise en fejlmeddelelse til brugeren, hvis det er relevant
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (!string.IsNullOrEmpty(UserName) && !string.IsNullOrEmpty(MessageInput) && hubConnection is not null)
+        {
+            Logger.LogInformation("Chat.razor: Forsøger at sende besked til server. Bruger: '{UserName}', Besked: '{MessageInput}'", UserName, MessageInput);
+            try
+            {
+                await hubConnection.SendAsync("SendMessage", UserName, MessageInput);
+                Logger.LogInformation("Chat.razor: Besked sendt succesfuldt (klient-side).");
+                MessageInput = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Chat.razor: Fejl ved afsendelse af besked via SignalR.");
+            }
+        }
+        else
+        {
+            Logger.LogWarning("Chat.razor: Kan ikke sende besked. Brugernavn, besked eller hubConnection mangler.");
+        }
+    }
+
+    private async Task SendOnEnter(KeyboardEventArgs e)
+    {
+        Logger.LogInformation((e is { Key: "Enter", CtrlKey: false }).ToString());
+        if (e is { Key: "Enter", CtrlKey: false })
+        {
+            await SendMessage();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+    private class ConversationItem
+    {
+        public string Username { get; set; }
+        public string Message { get; set; }
+    }
+}

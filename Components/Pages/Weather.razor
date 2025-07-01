@@ -1,35 +1,40 @@
 ﻿@page "/weather"
+@inject HttpClient Http
 @attribute [StreamRendering]
 
-<PageTitle>Weather</PageTitle>
+<PageTitle>Vejr</PageTitle>
 
-<h1>Weather</h1>
+<h1>Vejr</h1>
 
-<p>This component demonstrates showing data.</p>
-
-@if (forecasts == null)
+@if (indlæserPrognoser)
 {
-    <p><em>Loading...</em></p>
+    <p><em>Indlæser...</em></p>
 }
 else
 {
     <table class="table">
         <thead>
             <tr>
-                <th>Date</th>
+                <th>Dato</th>
                 <th>Temp. (C)</th>
-                <th>Temp. (F)</th>
-                <th>Summary</th>
+                <th>Regn</th>
+                <th>Byger</th>
+                <th>Skydække</th>
+                <th>Snefald</th>
+                <th>Sne dybde</th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var forecast in forecasts)
+            @foreach (var timebaseretVejr in timebaseretVejrListe)
             {
                 <tr>
-                    <td>@forecast.Date.ToShortDateString()</td>
-                    <td>@forecast.TemperatureC</td>
-                    <td>@forecast.TemperatureF</td>
-                    <td>@forecast.Summary</td>
+                    <td>@timebaseretVejr.Tid</td>
+                    <td>@timebaseretVejr.Temperatur2m</td>
+                    <td>@timebaseretVejr.Regn</td>
+                    <td>@timebaseretVejr.Byger</td>
+                    <td>@timebaseretVejr.Skydække</td>
+                    <td>@timebaseretVejr.Snefald</td>
+                    <td>@timebaseretVejr.SneDybde</td>
                 </tr>
             }
         </tbody>
@@ -37,28 +42,60 @@ else
 }
 
 @code {
-    private WeatherForecast[]? forecasts;
+    private bool indlæserPrognoser = true;
+    private WeatherForecast? prognose;
+    private List<TimebaseretVejrdata>? timebaseretVejrListe;
+    
+    // Koordinater for Aalborg
+    private const double Breddegrad = 57.048;
+    private const double Længdegrad = 9.9187;
 
     protected override async Task OnInitializedAsync()
     {
-        // Simulate asynchronous loading to demonstrate streaming rendering
-        await Task.Delay(500);
+        var anmodningsURL = $"https://api.open-meteo.com/v1/forecast?latitude={Breddegrad}&longitude={Længdegrad}&hourly[]=temperature_2m&hourly[]=rain&hourly[]=cloud_cover&hourly[]=showers&hourly[]=snowfall&hourly[]=snow_depth";
+        prognose = await Http.GetFromJsonAsync<WeatherForecast>(anmodningsURL);
+        timebaseretVejrListe = new List<TimebaseretVejrdata>();
 
-        var startDate = DateOnly.FromDateTime(DateTime.Now);
-        var summaries = new[] { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
-        forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        if (prognose?.Hourly?.Time != null)
         {
-            Date = startDate.AddDays(index),
-            TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = summaries[Random.Shared.Next(summaries.Length)]
-        }).ToArray();
+            for (int i = 0; i < prognose.Hourly.Time.Count; i++)
+            {
+                timebaseretVejrListe.Add(new TimebaseretVejrdata
+                {
+                    Tid = FormaterDatoTid(prognose.Hourly.Time[i]),
+                    Temperatur2m = $"{prognose.Hourly.Temperature2m?[i]} {prognose.HourlyUnits?.Temperature2m}",
+                    Regn = $"{prognose.Hourly.Rain?[i]} {prognose.HourlyUnits?.Rain}",
+                    Byger = $"{prognose.Hourly.Showers?[i]} {prognose.HourlyUnits?.Showers}",
+                    Skydække = $"{prognose.Hourly.CloudCover?[i]} {prognose.HourlyUnits?.CloudCover}",
+                    Snefald = $"{prognose.Hourly.Snowfall?[i]} {prognose.HourlyUnits?.Snowfall}",
+                    SneDybde = $"{prognose.Hourly.SnowDepth?[i]} {prognose.HourlyUnits?.SnowDepth}"
+                });
+            }
+        }
+
+        indlæserPrognoser = false;
+    }
+    
+    private string FormaterDatoTid(string isoString)
+    {
+        if (DateTime.TryParse(isoString, out var dt))
+        {
+            // Viser dags dato for i dag og i morgen for at gøre det mere læseligt
+            if (dt.Date == DateTime.Today) return $"I dag {dt:HH:mm}";
+            if (dt.Date == DateTime.Today.AddDays(1)) return $"I morgen {dt:HH:mm}";
+            return dt.ToString("dd/MM HH:mm");
+        }
+        return isoString;
     }
 
-    private class WeatherForecast
+    private class TimebaseretVejrdata
     {
-        public DateOnly Date { get; set; }
-        public int TemperatureC { get; set; }
-        public string? Summary { get; set; }
-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-    }
+        public string? Skydække { get; set; }
+        public string? Regn { get; set; }
+        public string? Byger { get; set; }
+        public string? SneDybde { get; set; }
+        public string? Snefald { get; set; }
+        public string? Temperatur2m { get; set; }
+        public string? Tid { get; set; }
+    } 
 }
